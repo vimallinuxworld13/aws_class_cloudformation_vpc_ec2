@@ -1,0 +1,112 @@
+Parameters:
+  AMI:
+    Type: String
+    Description: LW custom AMI for web server
+    Default: ami-05db93d568bbc05ce
+  InstanceType:
+    Type: String
+    Description: LW Test Instance Type
+    Default: t2.micro
+  KeyName:
+    Type: String
+    Description: Put ur ssh key
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties: 
+     CidrBlock: '10.0.0.0/16'
+     EnableDnsHostnames: true
+     EnableDnsSupport: true
+     InstanceTenancy: default
+     Tags: 
+     - Key: Name
+       Value: LW VPC CF
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties: 
+      Tags: 
+      - Key: Name
+        Value: LW IgW CF
+
+  VPCGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+
+
+  SubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.1.0/24
+      AvailabilityZone: !Select   [  0,  !GetAZs  ]
+      Tags:
+      - Key: Name
+        Value: mysubnetlab1
+
+  RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:  !Ref VPC
+      Tags:
+      - Key: Name
+        Value: LW RT CF
+
+
+  InternetRoute:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGateway
+    Properties:
+       RouteTableId: !Ref RouteTable
+       DestinationCidrBlock: 0.0.0.0/0
+       GatewayId: !Ref  InternetGateway
+
+
+  SubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref SubnetA
+      RouteTableId: !Ref RouteTable
+
+
+  MyFirstOSbyCF:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref AMI
+      SubnetId: !Ref SubnetA
+      InstanceType:  !Ref InstanceType
+      SecurityGroupIds: 
+      - Ref: InstanceSecurityGroup
+      AvailabilityZone: ap-south-1a
+      Tags:
+      - Key: Name
+        Value: LWoscf
+
+  MyEIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      InstanceId: !Ref MyFirstOSbyCF
+
+  InstanceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow http to client host
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 80
+        ToPort: 80
+        CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+      - IpProtocol: -1
+        CidrIp: 0.0.0.0/0
+      Tags:
+      - Key: Name
+        Value: LW_SF_CF
+
+
+Outputs:
+   PublicIp:
+      Value: !GetAtt MyFirstOSbyCF.PublicIp
